@@ -582,6 +582,14 @@ function NodesPage() {
     } catch {}
   }, [tagFilter])
 
+  // 当标签筛选变化时，自动填入对应的标签
+  useEffect(() => {
+    if (tagFilter !== 'all') {
+      setManualTag(tagFilter)
+      setSubscriptionTag(tagFilter)
+    }
+  }, [tagFilter])
+
   // 保存选中节点状态到 localStorage
   useEffect(() => {
     try {
@@ -2469,6 +2477,20 @@ vless://uuid@example.com:443?type=ws&security=tls&path=/websocket#VLESS节点
                         <Label htmlFor='manual-tag' className='text-sm font-medium'>
                           节点标签
                         </Label>
+                        {allUniqueTags.length > 0 && (
+                          <div className='flex flex-wrap gap-1.5'>
+                            {allUniqueTags.map((tag) => (
+                              <Badge
+                                key={tag}
+                                variant={manualTag === tag ? 'default' : 'outline'}
+                                className='cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors text-xs'
+                                onClick={() => setManualTag(tag)}
+                              >
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                         <Input
                           id='manual-tag'
                           placeholder='手动输入'
@@ -2533,6 +2555,20 @@ vless://uuid@example.com:443?type=ws&security=tls&path=/websocket#VLESS节点
                         <Label htmlFor='subscription-tag' className='text-sm font-medium'>
                           节点标签
                         </Label>
+                        {allUniqueTags.length > 0 && (
+                          <div className='flex flex-wrap gap-1.5'>
+                            {allUniqueTags.map((tag) => (
+                              <Badge
+                                key={tag}
+                                variant={subscriptionTag === tag ? 'default' : 'outline'}
+                                className='cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors text-xs'
+                                onClick={() => setSubscriptionTag(tag)}
+                              >
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                         <div className='flex items-center gap-4'>
                           <Input
                             id='subscription-tag'
