@@ -20,7 +20,7 @@
 ### 探针支持
 - [Nezha](https://github.com/naiba/nezha) 面板
 - [DStatus](https://github.com/DokiDoki1103/dstatus) 监控
-- [Komari](https://github.com/missuo/komari) 面板
+- [Komari](https://github.com/komari-monitor/komari) 面板
 
 ### 体验[Demo](https://demo.miaomiaowu.net)  
 账户/密码: test / test123
