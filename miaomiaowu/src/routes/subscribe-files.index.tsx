@@ -2419,15 +2419,7 @@ function SubscribeFilesPage() {
                   {
                     header: '订阅名称',
                     cell: (file) => (
-                      <div className='flex items-center gap-2 flex-wrap'>
-                        <Badge variant='outline' className={TYPE_COLORS[file.type]}>
-                          {TYPE_LABELS[file.type]}
-                        </Badge>
-                        <span className='font-medium'>{file.name}</span>
-                        {file.latest_version && (
-                          <Badge variant='secondary'>v{file.latest_version}</Badge>
-                        )}
-                      </div>
+                      <span className='font-medium'>{file.name}</span>
                     ),
                   },
                   {

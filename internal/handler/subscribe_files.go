@@ -1511,3 +1511,31 @@ func RefreshAllTemplateSubscriptions(repo *storage.TrafficRepository, username s
 
 	logger.Info("[模板刷新] 刷新完成", "total", len(files), "success", successCount)
 }
+
+// RefreshSubscriptionsByTemplate 刷新绑定了指定模板的订阅
+func RefreshSubscriptionsByTemplate(repo *storage.TrafficRepository, username string, templateFilename string) {
+	ctx := context.Background()
+
+	files, err := repo.GetSubscribeFilesByTemplate(ctx, templateFilename)
+	if err != nil {
+		logger.Info("[模板刷新] 获取绑定模板的订阅失败", "template", templateFilename, "error", err)
+		return
+	}
+	if len(files) == 0 {
+		return
+	}
+
+	logger.Info("[模板刷新] 开始刷新绑定指定模板的订阅", "template", templateFilename, "count", len(files))
+
+	h := &subscribeFilesHandler{repo: repo}
+	successCount := 0
+	for _, file := range files {
+		if err := h.regenerateFromTemplate(ctx, username, file); err != nil {
+			logger.Info("[模板刷新] 刷新订阅失败", "subscribe", file.Name, "error", err)
+		} else {
+			successCount++
+		}
+	}
+
+	logger.Info("[模板刷新] 刷新完成", "template", templateFilename, "total", len(files), "success", successCount)
+}
