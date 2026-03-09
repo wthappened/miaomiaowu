@@ -3007,9 +3007,9 @@ vless://uuid@example.com:443?type=ws&security=tls&path=/websocket#VLESS节点
                           >
                             <CardContent className='p-3 space-y-2'>
                               {/* 头部：协议、节点名称、已保存标签 */}
-                              <div className='flex items-start justify-between gap-2'>
-                                <div className='flex-1 min-w-0'>
-                                  <div className='flex items-center gap-2 mb-1'>
+                              <div>
+                                <div className='flex items-center justify-between gap-2 mb-1'>
+                                  <div className='flex items-center gap-2'>
                                     {node.isSaved && (
                                       <DragHandle id={node.id} size='large' />
                                     )}
@@ -3048,46 +3048,6 @@ vless://uuid@example.com:443?type=ws&security=tls&path=/websocket#VLESS节点
                                   <Check className='size-4 text-green-600' />
                                 )}
                               </div>
-                              {/* 节点名称 */}
-                              {editingNode?.id === node.id ? (
-                                <div className='flex items-center gap-1' onClick={(e) => e.stopPropagation()}>
-                                  <Input
-                                    value={editingNode.value}
-                                    onChange={(event) => handleNameEditChange(event.target.value)}
-                                    onKeyDown={(event) => {
-                                      if (event.key === 'Enter') {
-                                        event.preventDefault()
-                                        handleNameEditSubmit(node)
-                                      } else if (event.key === 'Escape') {
-                                        event.preventDefault()
-                                        handleNameEditCancel()
-                                      }
-                                    }}
-                                    className='h-7 flex-1 min-w-0'
-                                    autoFocus
-                                  />
-                                  <Button
-                                    variant='ghost'
-                                    size='icon'
-                                    className='size-7 text-emerald-600 shrink-0'
-                                    onClick={() => handleNameEditSubmit(node)}
-                                    disabled={node.isSaved ? isUpdatingNodeName : false}
-                                  >
-                                    <Check className='size-3.5' />
-                                  </Button>
-                                  <Button
-                                    variant='ghost'
-                                    size='icon'
-                                    className='size-7 text-muted-foreground shrink-0'
-                                    onClick={handleNameEditCancel}
-                                  >
-                                    <X className='size-3.5' />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <div className='font-medium text-sm break-all line-clamp-2'><Twemoji>{node.name || '未知'}</Twemoji></div>
-                              )}
-                            </div>
                             {/* 编辑、交换和探针绑定按钮 */}
                             {editingNode?.id !== node.id && (
                               <div className='flex items-center gap-1 shrink-0' onClick={(e) => e.stopPropagation()}>
@@ -3235,6 +3195,46 @@ vless://uuid@example.com:443?type=ws&security=tls&path=/websocket#VLESS节点
                                 )}
                               </div>
                             )}
+                          </div>
+                              {/* 节点名称 */}
+                              {editingNode?.id === node.id ? (
+                                <div className='flex items-center gap-1' onClick={(e) => e.stopPropagation()}>
+                                  <Input
+                                    value={editingNode.value}
+                                    onChange={(event) => handleNameEditChange(event.target.value)}
+                                    onKeyDown={(event) => {
+                                      if (event.key === 'Enter') {
+                                        event.preventDefault()
+                                        handleNameEditSubmit(node)
+                                      } else if (event.key === 'Escape') {
+                                        event.preventDefault()
+                                        handleNameEditCancel()
+                                      }
+                                    }}
+                                    className='h-7 flex-1 min-w-0'
+                                    autoFocus
+                                  />
+                                  <Button
+                                    variant='ghost'
+                                    size='icon'
+                                    className='size-7 text-emerald-600 shrink-0'
+                                    onClick={() => handleNameEditSubmit(node)}
+                                    disabled={node.isSaved ? isUpdatingNodeName : false}
+                                  >
+                                    <Check className='size-3.5' />
+                                  </Button>
+                                  <Button
+                                    variant='ghost'
+                                    size='icon'
+                                    className='size-7 text-muted-foreground shrink-0'
+                                    onClick={handleNameEditCancel}
+                                  >
+                                    <X className='size-3.5' />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className='font-medium text-sm truncate'><Twemoji>{node.name || '未知'}</Twemoji></div>
+                              )}
                           </div>
 
                           {/* 服务器地址和标签 */}
@@ -3471,7 +3471,7 @@ vless://uuid@example.com:443?type=ws&security=tls&path=/websocket#VLESS节点
                                           </Button>
                                         </div>
                                       ) : (
-                                        <div className='font-medium text-sm break-all line-clamp-2'><Twemoji>{node.name || '未知'}</Twemoji></div>
+                                        <div className='font-medium text-sm truncate'><Twemoji>{node.name || '未知'}</Twemoji></div>
                                       )}
                                     </div>
                                     {/* 编辑按钮 */}

@@ -2419,7 +2419,12 @@ function SubscribeFilesPage() {
                   {
                     header: '订阅名称',
                     cell: (file) => (
-                      <span className='font-medium'>{file.name}</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className='font-medium truncate block max-w-[16ch]'>{file.name}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>{file.name}</TooltipContent>
+                      </Tooltip>
                     ),
                   },
                   {
