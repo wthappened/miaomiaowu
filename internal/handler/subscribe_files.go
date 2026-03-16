@@ -50,6 +50,8 @@ func (h *subscribeFilesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		h.handleList(w, r)
 	case path == "" && r.Method == http.MethodPost:
 		h.handleCreate(w, r)
+	case path == "reorder" && r.Method == http.MethodPut:
+		h.handleReorder(w, r)
 	case path == "import" && r.Method == http.MethodPost:
 		h.handleImport(w, r)
 	case path == "upload" && r.Method == http.MethodPost:
@@ -84,6 +86,25 @@ func (h *subscribeFilesHandler) handleList(w http.ResponseWriter, r *http.Reques
 	respondJSON(w, http.StatusOK, map[string]any{
 		"files": h.convertSubscribeFilesWithVersions(r.Context(), files),
 	})
+}
+
+func (h *subscribeFilesHandler) handleReorder(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IDs []int64 `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeBadRequest(w, "请求格式不正确")
+		return
+	}
+	if len(req.IDs) == 0 {
+		writeBadRequest(w, "排序列表不能为空")
+		return
+	}
+	if err := h.repo.ReorderSubscribeFiles(r.Context(), req.IDs); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (h *subscribeFilesHandler) handleCreate(w http.ResponseWriter, r *http.Request) {

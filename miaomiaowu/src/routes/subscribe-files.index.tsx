@@ -578,6 +578,34 @@ function SubscribeFilesPage() {
     },
   })
 
+  // 排序订阅
+  const reorderMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      await api.put('/api/admin/subscribe-files/reorder', { ids })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscribe-files'] })
+      queryClient.invalidateQueries({ queryKey: ['user-subscriptions'] })
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || '排序失败')
+    },
+  })
+
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return
+    const newFiles = [...files]
+    ;[newFiles[index - 1], newFiles[index]] = [newFiles[index], newFiles[index - 1]]
+    reorderMutation.mutate(newFiles.map(f => f.id))
+  }
+
+  const handleMoveDown = (index: number) => {
+    if (index >= files.length - 1) return
+    const newFiles = [...files]
+    ;[newFiles[index], newFiles[index + 1]] = [newFiles[index + 1], newFiles[index]]
+    reorderMutation.mutate(newFiles.map(f => f.id))
+  }
+
   // 删除订阅
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -2952,8 +2980,30 @@ function SubscribeFilesPage() {
                   }] as DataTableColumn<SubscribeFile>[] : []),
                   {
                     header: '操作',
-                    cell: (file) => (
+                    cell: (file) => {
+                      const idx = files.findIndex(f => f.id === file.id)
+                      return (
                       <div className='flex items-center gap-1'>
+                        <Button
+                          variant='ghost'
+                          size='icon'
+                          className='h-7 w-7'
+                          onClick={() => handleMoveUp(idx)}
+                          disabled={idx === 0 || reorderMutation.isPending}
+                          title='上移'
+                        >
+                          <ChevronUp className='h-4 w-4' />
+                        </Button>
+                        <Button
+                          variant='ghost'
+                          size='icon'
+                          className='h-7 w-7'
+                          onClick={() => handleMoveDown(idx)}
+                          disabled={idx >= files.length - 1 || reorderMutation.isPending}
+                          title='下移'
+                        >
+                          <ChevronDown className='h-4 w-4' />
+                        </Button>
                         <Button
                           variant='ghost'
                           size='sm'
@@ -2996,10 +3046,10 @@ function SubscribeFilesPage() {
                           </AlertDialogContent>
                         </AlertDialog>
                       </div>
-                    ),
+                    )},
                     headerClassName: 'text-center',
                     cellClassName: 'text-center',
-                    width: '120px'
+                    width: '180px'
                   }
                 ] as DataTableColumn<SubscribeFile>[]}
 

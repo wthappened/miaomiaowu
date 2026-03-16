@@ -234,6 +234,7 @@ type SubscribeFile struct {
 	TemplateFilename    string     // 绑定的 V3 模板文件名，为空表示未绑定模板
 	SelectedTags        []string   // 选中的节点标签，为空表示使用所有节点
 	RawOutput           bool       // 非Clash配置，直接输出原始内容
+	SortOrder           int        // 排序权重，值越小越靠前
 	ExpireAt            *time.Time // Optional expiration timestamp
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
@@ -948,6 +949,11 @@ CREATE INDEX IF NOT EXISTS idx_custom_rules_enabled ON custom_rules(enabled);
 
 	// 添加 selected_tags 字段，用于存储选中的节点标签（JSON 数组）
 	if err := r.ensureSubscribeFileColumn("selected_tags", "TEXT NOT NULL DEFAULT '[]'"); err != nil {
+		return err
+	}
+
+	// 添加 sort_order 字段，用于自定义排序
+	if err := r.ensureSubscribeFileColumn("sort_order", "INTEGER NOT NULL DEFAULT 0"); err != nil {
 		return err
 	}
 
@@ -3337,11 +3343,11 @@ func (r *TrafficRepository) GetUserSubscriptions(ctx context.Context, username s
 	}
 
 	const stmt = `
-		SELECT s.id, s.name, COALESCE(s.description, ''), COALESCE(s.url, ''), s.type, s.filename, COALESCE(s.file_short_code, ''), COALESCE(s.custom_short_code, ''), COALESCE(s.auto_sync_custom_rules, 0), COALESCE(s.template_filename, ''), s.expire_at, s.created_at, s.updated_at
+		SELECT s.id, s.name, COALESCE(s.description, ''), COALESCE(s.url, ''), s.type, s.filename, COALESCE(s.file_short_code, ''), COALESCE(s.custom_short_code, ''), COALESCE(s.auto_sync_custom_rules, 0), COALESCE(s.template_filename, ''), COALESCE(s.sort_order, 0), s.expire_at, s.created_at, s.updated_at
 		FROM subscribe_files s
 		INNER JOIN user_subscriptions us ON s.id = us.subscription_id
 		WHERE us.username = ?
-		ORDER BY s.created_at DESC
+		ORDER BY s.sort_order ASC, s.created_at DESC
 	`
 	rows, err := r.db.QueryContext(ctx, stmt, username)
 	if err != nil {
@@ -3354,7 +3360,7 @@ func (r *TrafficRepository) GetUserSubscriptions(ctx context.Context, username s
 		var sub SubscribeFile
 		var autoSync int
 		var expireAt sql.NullTime
-		if err := rows.Scan(&sub.ID, &sub.Name, &sub.Description, &sub.URL, &sub.Type, &sub.Filename, &sub.FileShortCode, &sub.CustomShortCode, &autoSync, &sub.TemplateFilename, &expireAt, &sub.CreatedAt, &sub.UpdatedAt); err != nil {
+		if err := rows.Scan(&sub.ID, &sub.Name, &sub.Description, &sub.URL, &sub.Type, &sub.Filename, &sub.FileShortCode, &sub.CustomShortCode, &autoSync, &sub.TemplateFilename, &sub.SortOrder, &expireAt, &sub.CreatedAt, &sub.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan subscription: %w", err)
 		}
 		sub.AutoSyncCustomRules = autoSync != 0
@@ -4172,10 +4178,10 @@ func (r *TrafficRepository) GetSubscribeFilesWithAutoSync(ctx context.Context) (
 		return nil, errors.New("traffic repository not initialized")
 	}
 
-	const query = `SELECT id, name, COALESCE(description, ''), url, type, filename, COALESCE(file_short_code, ''), auto_sync_custom_rules, COALESCE(template_filename, ''), expire_at, created_at, updated_at
+	const query = `SELECT id, name, COALESCE(description, ''), url, type, filename, COALESCE(file_short_code, ''), auto_sync_custom_rules, COALESCE(template_filename, ''), COALESCE(sort_order, 0), expire_at, created_at, updated_at
 		FROM subscribe_files
 		WHERE auto_sync_custom_rules = 1
-		ORDER BY created_at DESC`
+		ORDER BY sort_order ASC, created_at DESC`
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -4188,7 +4194,7 @@ func (r *TrafficRepository) GetSubscribeFilesWithAutoSync(ctx context.Context) (
 		var file SubscribeFile
 		var autoSync int
 		var expireAt sql.NullTime
-		if err := rows.Scan(&file.ID, &file.Name, &file.Description, &file.URL, &file.Type, &file.Filename, &file.FileShortCode, &autoSync, &file.TemplateFilename, &expireAt, &file.CreatedAt, &file.UpdatedAt); err != nil {
+		if err := rows.Scan(&file.ID, &file.Name, &file.Description, &file.URL, &file.Type, &file.Filename, &file.FileShortCode, &autoSync, &file.TemplateFilename, &file.SortOrder, &expireAt, &file.CreatedAt, &file.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan subscribe file: %w", err)
 		}
 		file.AutoSyncCustomRules = autoSync != 0
