@@ -200,6 +200,7 @@ type SavedNode = {
   clash_config: string
   enabled: boolean
   tag: string
+  tags: string[]
   probe_server: string
   created_at: string
   updated_at: string
@@ -796,7 +797,7 @@ function SubscriptionGeneratorPage() {
   const protocols = Array.from(new Set(sortedEnabledNodes.map(n => n.protocol.toLowerCase()))).sort()
 
   // 获取所有标签类型
-  const tags = Array.from(new Set(sortedEnabledNodes.map(n => n.tag))).sort()
+  const tags = Array.from(new Set(sortedEnabledNodes.flatMap(n => n.tags?.length ? n.tags : (n.tag ? [n.tag] : [])))).sort()
 
   // 节点列表根据选中的协议和标签筛选
   const filteredNodes = useMemo(() => {
@@ -812,7 +813,8 @@ function SubscriptionGeneratorPage() {
       }
       // 标签筛选
       if (selectedTags.size > 0) {
-        return selectedTags.has(node.tag)
+        const nodeTags = node.tags?.length ? node.tags : (node.tag ? [node.tag] : [])
+        return nodeTags.some(t => selectedTags.has(t))
       }
       return true
     })
@@ -2294,7 +2296,7 @@ function SubscriptionGeneratorPage() {
                         全部标签 ({sortedEnabledNodes.length})
                       </Button>
                       {tags.map((tag) => {
-                        const count = sortedEnabledNodes.filter(n => n.tag === tag).length
+                        const count = sortedEnabledNodes.filter(n => (n.tags?.length ? n.tags : [n.tag]).includes(tag)).length
                         const isTagSelected = selectedTags.has(tag)
                         return (
                           <Button
@@ -2304,7 +2306,7 @@ function SubscriptionGeneratorPage() {
                             onClick={() => {
                               // 获取该标签的所有节点（协议和标签互斥，不考虑协议）
                               const tagNodeIds = sortedEnabledNodes
-                                .filter(n => n.tag === tag)
+                                .filter(n => (n.tags?.length ? n.tags : [n.tag]).includes(tag))
                                 .map(n => n.id)
 
                               // 清空协议选择（协议和标签互斥）
@@ -2395,11 +2397,11 @@ function SubscriptionGeneratorPage() {
                         header: '标签',
                         cell: (node) => (
                           <div className='flex flex-wrap gap-1'>
-                            {node.tag && (
-                              <Badge variant='secondary' className='text-xs'>
-                                {node.tag}
+                            {(node.tags?.length ? node.tags : node.tag ? [node.tag] : []).map(t => (
+                              <Badge key={t} variant='secondary' className='text-xs'>
+                                {t}
                               </Badge>
-                            )}
+                            ))}
                             {node.probe_server && (
                               <Badge variant='secondary' className='text-xs flex items-center gap-1'>
                                 <Activity className='size-3' />
@@ -2429,13 +2431,13 @@ function SubscriptionGeneratorPage() {
                           {/* 第二行：标签 + 服务器地址 */}
                           <div className='flex items-center gap-2 text-xs'>
                             {/* 标签部分 */}
-                            {(node.tag || node.probe_server) && (
+                            {((node.tags?.length || node.tag) || node.probe_server) && (
                               <div className='flex items-center gap-1 shrink-0'>
-                                {node.tag && (
-                                  <Badge variant='secondary' className='text-xs'>
-                                    {node.tag}
+                                {(node.tags?.length ? node.tags : node.tag ? [node.tag] : []).map(t => (
+                                  <Badge key={t} variant='secondary' className='text-xs'>
+                                    {t}
                                   </Badge>
-                                )}
+                                ))}
                                 {node.probe_server && (
                                   <Badge variant='secondary' className='text-xs flex items-center gap-1'>
                                     <Activity className='size-3' />
@@ -2627,7 +2629,7 @@ function SubscriptionGeneratorPage() {
                         </Button>
                         {tags.map((tag) => {
                           const isSelected = selectedV3Tags.includes(tag)
-                          const count = sortedEnabledNodes.filter(n => n.tag === tag).length
+                          const count = sortedEnabledNodes.filter(n => (n.tags?.length ? n.tags : [n.tag]).includes(tag)).length
                           return (
                             <Button
                               key={tag}

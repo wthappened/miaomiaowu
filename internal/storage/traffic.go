@@ -213,7 +213,8 @@ type Node struct {
 	ParsedConfig   string
 	ClashConfig    string
 	Enabled        bool
-	Tag            string
+	Tag            string   // 向后兼容，等于 Tags[0]
+	Tags           []string // 多标签支持
 	OriginalServer string
 	ProbeServer    string // Probe server name for binding
 	CreatedAt      time.Time
@@ -643,6 +644,13 @@ CREATE INDEX IF NOT EXISTS idx_nodes_enabled ON nodes(enabled);
 	if err := r.ensureNodeColumn("probe_server", "TEXT"); err != nil {
 		return err
 	}
+
+	// Add tags column (JSON array) for multi-tag support
+	if err := r.ensureNodeColumn("tags", "TEXT NOT NULL DEFAULT '[]'"); err != nil {
+		return err
+	}
+	// Migrate existing tag data to tags column
+	r.db.Exec(`UPDATE nodes SET tags = '["' || REPLACE(tag, '"', '\"') || '"]' WHERE (tags = '[]' OR tags = '') AND tag != '' AND tag IS NOT NULL`)
 
 	// Create tag index after ensuring column exists
 	if _, err := r.db.Exec(`CREATE INDEX IF NOT EXISTS idx_nodes_tag ON nodes(tag);`); err != nil {

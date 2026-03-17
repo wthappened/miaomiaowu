@@ -520,8 +520,8 @@ func (h *SubscriptionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 							logger.Info("[Subscription] 查询数据库中的节点", "count", len(usedNodeNames))
 							nodes, err := h.repo.ListNodes(r.Context(), username)
 							if err == nil {
-								// 收集使用到的外部订阅名称（通过 tag 识别）
-								usedExternalSubs := make(map[string]bool)
+								// 收集使用到的外部订阅URL（通过 RawURL 识别）
+								usedExternalSubURLs := make(map[string]bool)
 
 								for _, node := range nodes {
 									// 检查节点是否在订阅文件中
@@ -537,26 +537,22 @@ func (h *SubscriptionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 											logger.Info("[Subscription] 检测到探针节点绑定服务器", "node_name", node.NodeName, "probe_server", node.ProbeServer)
 										}
 
-										// 如果开启了流量同步，收集外部订阅节点
-										if settings.SyncTraffic {
-											// 如果 tag 不是默认值，说明是外部订阅节点
-											if node.Tag != "" && node.Tag != "手动输入" {
-												usedExternalSubs[node.Tag] = true
-												logger.Info("[Subscription] 节点来自外部订阅", "node_name", node.NodeName, "tag", node.Tag)
-											}
+										// 如果开启了流量同步，通过 RawURL 收集外部订阅节点
+										if settings.SyncTraffic && node.RawURL != "" {
+											usedExternalSubURLs[node.RawURL] = true
 										}
 									}
 								}
 
 								// 如果开启了流量同步且有使用到外部订阅的节点，汇总这些订阅的流量
-								if settings.SyncTraffic && len(usedExternalSubs) > 0 {
-									logger.Info("[Subscription] 用户启用流量同步，找到使用中的外部订阅", "user", username, "count", len(usedExternalSubs), "tags", getKeys(usedExternalSubs))
+								if settings.SyncTraffic && len(usedExternalSubURLs) > 0 {
+									logger.Info("[Subscription] 用户启用流量同步，找到使用中的外部订阅", "user", username, "count", len(usedExternalSubURLs))
 									externalSubs, err := h.repo.ListExternalSubscriptions(r.Context(), username)
 									if err == nil {
 										now := time.Now()
 										for _, sub := range externalSubs {
-											// 只汇总使用到的外部订阅
-											if usedExternalSubs[sub.Name] {
+											// 只汇总使用到的外部订阅（通过URL匹配）
+											if usedExternalSubURLs[sub.URL] {
 												// 如果有过期时间且已过期，则跳过
 												// 如果过期时间为空，表示长期订阅，不跳过
 												if sub.Expire != nil && sub.Expire.Before(now) {
@@ -951,40 +947,12 @@ func GetExternalSubscriptionsFromFile(ctx context.Context, data []byte, username
 				return usedURLs, fmt.Errorf("failed to list nodes: %w", err)
 			}
 
-			// 收集使用到的外部订阅标签（节点的 Tag 字段）
-			usedTags := make(map[string]bool)
-
-			// Find matching nodes and collect their raw_url and tags
+			// Find matching nodes and collect their raw_url
 			for _, node := range nodes {
 				if proxyNames[node.NodeName] {
-					// 如果节点有 RawURL，直接使用
 					if node.RawURL != "" {
 						usedURLs[node.RawURL] = true
 						logger.Info("[Subscription] 从节点找到外部订阅URL", "node_name", node.NodeName, "url", node.RawURL)
-					}
-					// 如果节点有 Tag（外部订阅名称），记录下来
-					if node.Tag != "" && node.Tag != "手动输入" {
-						usedTags[node.Tag] = true
-						logger.Info("[Subscription] 节点来自外部订阅", "node_name", node.NodeName, "tag", node.Tag)
-					}
-				}
-			}
-
-			// 妙妙屋模式：通过节点的 Tag（外部订阅名称）找到外部订阅URL
-			if len(usedTags) > 0 {
-				logger.Info("[Subscription] 发现使用外部订阅的节点", "tag_count", len(usedTags))
-
-				// 获取所有外部订阅
-				externalSubs, err := repo.ListExternalSubscriptions(ctx, username)
-				if err != nil {
-					logger.Info("[Subscription] 获取外部订阅列表失败", "error", err)
-				} else {
-					// 根据 Tag（外部订阅名称）找到对应的 URL
-					for _, sub := range externalSubs {
-						if usedTags[sub.Name] {
-							usedURLs[sub.URL] = true
-							logger.Info("[Subscription] 从节点Tag找到外部订阅URL", "tag", sub.Name, "url", sub.URL)
-						}
 					}
 				}
 			}
@@ -1862,7 +1830,7 @@ func (h *SubscriptionHandler) generateFromTemplate(ctx context.Context, username
 			continue // 跳过禁用的节点
 		}
 		// 标签过滤：只使用选中标签的节点
-		if hasTagFilter && !selectedTagsMap[node.Tag] {
+		if hasTagFilter && !node.HasAnyTag(selectedTagsMap) {
 			continue
 		}
 		// ClashConfig 是 JSON 格式的字符串，需要解析
@@ -1886,17 +1854,20 @@ func (h *SubscriptionHandler) generateFromTemplate(ctx context.Context, username
 
 	// 构建 providers map：provider name -> proxy names
 	providers := make(map[string][]string)
+	providerTagSet := make(map[string]bool)
 	for _, config := range providerConfigs {
-		// 获取该代理集合下的所有节点名称
-		// 通过 tag 字段匹配：节点的 tag 等于代理集合的名称
-		var providerProxyNames []string
+		providerTagSet[config.Name] = true
+	}
+	if len(providerTagSet) > 0 {
 		for _, node := range nodes {
-			if node.Enabled && node.Tag == config.Name {
-				providerProxyNames = append(providerProxyNames, node.NodeName)
+			if !node.Enabled {
+				continue
 			}
-		}
-		if len(providerProxyNames) > 0 {
-			providers[config.Name] = providerProxyNames
+			for _, t := range node.Tags {
+				if providerTagSet[t] {
+					providers[t] = append(providers[t], node.NodeName)
+				}
+			}
 		}
 	}
 	logger.Info("[模板生成] 从代理集合表获取代理集合", "count", len(providerConfigs), "with_nodes", len(providers))

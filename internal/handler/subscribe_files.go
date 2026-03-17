@@ -1489,7 +1489,7 @@ func (h *subscribeFilesHandler) regenerateFromTemplate(ctx context.Context, user
 		}
 		enabledCount++
 		// 如果设置了标签过滤，只使用选中标签的节点
-		if hasTagFilter && !selectedTagsMap[node.Tag] {
+		if hasTagFilter && !node.HasAnyTag(selectedTagsMap) {
 			filteredByTagCount++
 			continue
 		}
@@ -1514,17 +1514,20 @@ func (h *subscribeFilesHandler) regenerateFromTemplate(ctx context.Context, user
 
 	// 构建 providers map：provider name -> proxy names
 	providers := make(map[string][]string)
+	providerTagSet := make(map[string]bool)
 	for _, config := range providerConfigs {
-		// 获取该代理集合下的所有节点名称
-		// 通过 tag 字段匹配：节点的 tag 等于代理集合的名称
-		var providerProxyNames []string
+		providerTagSet[config.Name] = true
+	}
+	if len(providerTagSet) > 0 {
 		for _, node := range nodes {
-			if node.Enabled && node.Tag == config.Name {
-				providerProxyNames = append(providerProxyNames, node.NodeName)
+			if !node.Enabled {
+				continue
 			}
-		}
-		if len(providerProxyNames) > 0 {
-			providers[config.Name] = providerProxyNames
+			for _, t := range node.Tags {
+				if providerTagSet[t] {
+					providers[t] = append(providers[t], node.NodeName)
+				}
+			}
 		}
 	}
 	logger.Info("[模板生成] 从代理集合表获取代理集合", "count", len(providerConfigs), "with_nodes", len(providers))

@@ -490,7 +490,7 @@ function SubscribeFilesPage() {
     queryKey: ['all-nodes-with-tags'],
     queryFn: async () => {
       const response = await api.get('/api/admin/nodes')
-      return response.data as { nodes: Array<{ id: number; node_name: string; tag: string }> }
+      return response.data as { nodes: Array<{ id: number; node_name: string; tag: string; tags: string[] }> }
     },
     enabled: Boolean(auth.accessToken && (isExternalSubsExpanded || hasTemplateBindings)),
   })
@@ -500,10 +500,11 @@ function SubscribeFilesPage() {
     const nodes = allNodesData?.nodes ?? []
     const grouped: Record<string, string[]> = {}
     for (const node of nodes) {
-      if (!grouped[node.tag]) {
-        grouped[node.tag] = []
+      const nodeTags = node.tags?.length ? node.tags : (node.tag ? [node.tag] : [])
+      for (const t of nodeTags) {
+        if (!grouped[t]) grouped[t] = []
+        grouped[t].push(node.node_name)
       }
-      grouped[node.tag].push(node.node_name)
     }
     return grouped
   }, [allNodesData])
@@ -513,9 +514,8 @@ function SubscribeFilesPage() {
     const nodes = allNodesData?.nodes ?? []
     const tags = new Set<string>()
     for (const node of nodes) {
-      if (node.tag) {
-        tags.add(node.tag)
-      }
+      const nodeTags = node.tags?.length ? node.tags : (node.tag ? [node.tag] : [])
+      for (const t of nodeTags) tags.add(t)
     }
     return Array.from(tags).sort()
   }, [allNodesData])

@@ -52,6 +52,7 @@ interface ProxyGroup {
 interface Node {
   node_name: string
   tag?: string
+  tags?: string[]
   [key: string]: any
 }
 
@@ -201,9 +202,8 @@ export function MobileEditNodesDialog({
   const allTags = useMemo(() => {
     const tags = new Set<string>()
     allNodes.forEach(node => {
-      if (node.tag) {
-        tags.add(node.tag)
-      }
+      const nodeTags = node.tags?.length ? node.tags : (node.tag ? [node.tag] : [])
+      for (const t of nodeTags) tags.add(t)
     })
     return Array.from(tags).sort()
   }, [allNodes])
@@ -220,7 +220,10 @@ export function MobileEditNodesDialog({
         // 搜索过滤
         if (searchQuery && !node.node_name.toLowerCase().includes(searchQuery.toLowerCase())) return false
         // 标签过滤
-        if (selectedTag !== 'all' && node.tag !== selectedTag) return false
+        if (selectedTag !== 'all') {
+          const nodeTags = node.tags?.length ? node.tags : (node.tag ? [node.tag] : [])
+          if (!nodeTags.includes(selectedTag)) return false
+        }
         return true
       })
       .map(n => n.node_name)
@@ -753,11 +756,11 @@ export function MobileEditNodesDialog({
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate"><Twemoji>{nodeName}</Twemoji></p>
-                            {node?.tag && (
-                              <Badge variant="secondary" className="text-xs mt-1">
-                                {node.tag}
+                            {(node?.tags?.length ? node.tags : node?.tag ? [node.tag] : []).map(t => (
+                              <Badge key={t} variant="secondary" className="text-xs mt-1">
+                                {t}
                               </Badge>
-                            )}
+                            ))}
                           </div>
                         </div>
                       )
