@@ -766,6 +766,10 @@ func (h *SubscriptionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 					}
 				}
 
+				// 兼容旧链式代理配置：如果存在 "🌄 落地节点" 和 "🌠 中转节点" 代理组，
+				// 给落地节点组内的节点自动添加 dialer-proxy: 🌠 中转节点
+				injectLegacyDialerProxy(rootMap)
+
 				// 查找 rule-providers 的位置
 				ruleProvidersIdx := -1
 				for i := 0; i < len(rootMap.Content); i += 2 {
@@ -1656,6 +1660,90 @@ func reorderProxyGroupFields(groupNode *yaml.Node) {
 
 	// Replace the original content
 	groupNode.Content = newContent
+}
+
+// injectLegacyDialerProxy 兼容旧链式代理配置：
+// 当 proxy-groups 中同时存在 "🌄 落地节点" 和 "🌠 中转节点" 时，
+// 给落地节点组内的所有 proxy 自动添加 dialer-proxy: 🌠 中转节点（已有则跳过）
+func injectLegacyDialerProxy(rootMap *yaml.Node) {
+	const landingGroup = "🌄 落地节点"
+	const relayGroup = "🌠 中转节点"
+
+	// 查找 proxy-groups
+	var proxyGroupsNode *yaml.Node
+	for i := 0; i < len(rootMap.Content); i += 2 {
+		if rootMap.Content[i].Value == "proxy-groups" {
+			proxyGroupsNode = rootMap.Content[i+1]
+			break
+		}
+	}
+	if proxyGroupsNode == nil || proxyGroupsNode.Kind != yaml.SequenceNode {
+		return
+	}
+
+	// 收集落地节点组的 proxies 名称，同时确认中转节点组存在
+	hasRelay := false
+	landingProxies := make(map[string]bool)
+	for _, groupNode := range proxyGroupsNode.Content {
+		if groupNode.Kind != yaml.MappingNode {
+			continue
+		}
+		name := yamlMapGet(groupNode, "name")
+		if name == relayGroup {
+			hasRelay = true
+		}
+		if name == landingGroup {
+			for i := 0; i < len(groupNode.Content); i += 2 {
+				if groupNode.Content[i].Value == "proxies" && groupNode.Content[i+1].Kind == yaml.SequenceNode {
+					for _, pNode := range groupNode.Content[i+1].Content {
+						landingProxies[pNode.Value] = true
+					}
+				}
+			}
+		}
+	}
+	if !hasRelay || len(landingProxies) == 0 {
+		return
+	}
+
+	// 查找 proxies 节点，给命中的节点注入 dialer-proxy
+	for i := 0; i < len(rootMap.Content); i += 2 {
+		if rootMap.Content[i].Value != "proxies" {
+			continue
+		}
+		proxiesNode := rootMap.Content[i+1]
+		if proxiesNode.Kind != yaml.SequenceNode {
+			break
+		}
+		for _, proxyNode := range proxiesNode.Content {
+			if proxyNode.Kind != yaml.MappingNode {
+				continue
+			}
+			proxyName := yamlMapGet(proxyNode, "name")
+			if !landingProxies[proxyName] {
+				continue
+			}
+			// 已有 dialer-proxy 则跳过
+			if yamlMapGet(proxyNode, "dialer-proxy") != "" {
+				continue
+			}
+			proxyNode.Content = append(proxyNode.Content,
+				&yaml.Node{Kind: yaml.ScalarNode, Value: "dialer-proxy"},
+				&yaml.Node{Kind: yaml.ScalarNode, Value: relayGroup},
+			)
+		}
+		break
+	}
+}
+
+// yamlMapGet 从 MappingNode 中读取指定 key 的字符串值
+func yamlMapGet(node *yaml.Node, key string) string {
+	for i := 0; i < len(node.Content)-1; i += 2 {
+		if node.Content[i].Value == key {
+			return node.Content[i+1].Value
+		}
+	}
+	return ""
 }
 
 // stripDialerProxyGroup 从 proxy-groups 中移除 dialer-proxy-group 字段（仅用于 API 输出）
