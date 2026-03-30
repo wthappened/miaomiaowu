@@ -16,6 +16,25 @@ func filterProxyNamesByRegex(allNames []string, regexFilters []string) []string 
 	pattern := MergeRegexFilters(regexFilters)
 	re, err := compileCompatibleRegex(pattern)
 	if err != nil {
+		// Fallback for common PCRE pattern:
+		// ^((?!term1|term2|...).)*$  => keep names that don't contain any term.
+		if terms, ok := parseSimpleNegativeLookaheadContains(pattern); ok {
+			var matched []string
+			for _, name := range allNames {
+				excluded := false
+				for _, term := range terms {
+					if strings.Contains(name, term) {
+						excluded = true
+						break
+					}
+				}
+				if !excluded {
+					matched = append(matched, name)
+				}
+			}
+			return matched
+		}
+
 		// Invalid regex, return all names
 		return allNames
 	}

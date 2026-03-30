@@ -7,6 +7,7 @@ import (
 )
 
 var simpleNegativeLookbehindPattern = regexp.MustCompile(`\(\?<\!([^()]*)\)((?:\\.|.))`)
+var simpleNegativeLookaheadContainsPattern = regexp.MustCompile(`^\^\(\(\?!([^()]*)\)\.\)\*\$$`)
 
 // normalizeRegexPattern converts some PCRE-style patterns to RE2-compatible forms.
 // Currently supported:
@@ -72,4 +73,37 @@ func matchCompatibleRegex(pattern, input string) (bool, error) {
 		return false, err
 	}
 	return re.MatchString(input), nil
+}
+
+// parseSimpleNegativeLookaheadContains extracts literal exclusion terms from:
+// ^((?!term1|term2|...).)*$
+// Returns false if pattern is not this exact form or contains non-literal terms.
+func parseSimpleNegativeLookaheadContains(pattern string) ([]string, bool) {
+	m := simpleNegativeLookaheadContainsPattern.FindStringSubmatch(strings.TrimSpace(pattern))
+	if len(m) != 2 {
+		return nil, false
+	}
+
+	parts := strings.Split(m[1], "|")
+	if len(parts) == 0 {
+		return nil, false
+	}
+
+	terms := make([]string, 0, len(parts))
+	for _, part := range parts {
+		term := strings.TrimSpace(part)
+		if term == "" {
+			continue
+		}
+		// Only allow literal terms in this fallback matcher.
+		if strings.ContainsAny(term, `\.^$*+?()[]{}|`) {
+			return nil, false
+		}
+		terms = append(terms, term)
+	}
+
+	if len(terms) == 0 {
+		return nil, false
+	}
+	return terms, true
 }
